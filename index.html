@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+	img{ float: right; }
+	span{ margin-left: 12px; }
+	#df{ margin-left: 12px; }
+</style>
+  <script src="http://code.jquery.com/jquery-latest.js"></script>
+  <script src="http://benpickles.github.com/peity/jquery.peity.min.js"></script>
+</head>
+<body>
+  <img src="images/iconnect.jpg">
+  <h1>storage.local</h1>
+  <h2>Disk Usage</h2>
+  <div class="df"></div>
+  <h2>Memory Usage</h2>
+  <div class="free"></div>
+  <h2>CPU Usage (2min)</h2>
+  <div class="stat">0</div>
+<script>
+$.getJSON("/cgi-bin/montool.sh?info",
+  function(data) {
+    $('h1').after('<div>'+data.server+'<address>'+data.uname+'</address></div>');
+    $('h1').text(data.servername+" ("+data.hostname+")");
+  });
+$.getJSON("/cgi-bin/montool.sh?df",
+  function(data) {
+    $.each(data.items, function(i,item){
+     	$('<div device="'+item.device+'">'+item.mounted+'<span class="pie">'+item.use+'/100</span>'+'</div>').appendTo('div.df');
+    });
+    $("div.df > div > span.pie").peity("pie", {
+      colours: function() {
+        return ["#ddd", "#0a0"]
+      }
+    });
+  });
+function memstat() {
+$.getJSON("/cgi-bin/montool.sh?free",
+  function(data) {
+    color="#0a0";
+    if(data.used > data.total/2)
+    color="#a00";
+    $('div.free').html('<div>Used<span class="pie">'+data.used+'/'+data.total+'</span>'+'</div>');
+    $("div.free > div > span.pie").peity("pie", {
+      colours: function() {
+        return ["#ddd", color] 
+      }
+    });
+  });
+}
+function cpustat() {
+$.getJSON("/cgi-bin/montool.sh?stat",
+  function(data) {
+    /* Update stat */
+    var cpu = $('div.stat').text() + ',' + data.cpu;
+    /* just keep track of the last 120 seconds */
+    if(cpu.split(",").length > 120/interval)
+	cpu = cpu.substr(cpu.indexOf(",")+1);
+    $('div.stat').text(cpu);
+    $('div.stat').peity("line", {
+	width: 120,
+	max: 100
+    });
+  });
+}
+var interval = 5;
+var cpu_refresh = setInterval(cpustat, interval*1000);
+var mem_refresh = setInterval(memstat, interval*1000);
+</script>
+</body>
+</html>
