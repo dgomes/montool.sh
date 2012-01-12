@@ -9,28 +9,36 @@ echo "Content-type: application/json\n"
 
 json_string () {
 	if [ "$LAST" = "VAL" ]; then
-		echo -n ,
+		echo -n ','
 	fi
-	echo $1\ $2 | awk '{printf "\"%s\": \"%s\"", $1, $2}' 
+	echo -n \"
+	echo -n $1
+	echo -n \":\"
+	echo -n $2
+	echo -n \"
 	LAST="VAL"
 }
 
 json_number () {
 	if [ "$LAST" = "VAL" ]; then
-		echo -n ,
+		echo -n ','
 	fi
-	echo $1\ $2 | awk '{printf "\"%s\": %s", $1, $2}' 
+	echo -n \"
+	echo -n $1
+	echo -n \":
+	echo -n $2
 	LAST="VAL"
 }
 
 json_array () {
 	if [ "$LAST" = "VAL" ]; then
-		echo -n ,
+		echo -n ','
 	fi
 	if [ -z $1 ]; then
-		echo -n \]
+		echo -n ']'
 	else
-		echo \"$1\":\[
+		echo -n \"$1\"
+		echo ':['
 	fi
 	LAST="ARRAY"
 }
@@ -41,14 +49,14 @@ json_obj () {
 	fi	
 
 	if [ -z $1 ]; then
-		echo -n \{
+		echo -n '{'
 	else
-		echo -n \}
+		echo -n '}'
 		LAST="OBJ"
 	fi
 }
 
-diff_val_fifo () {
+diff_val_shm () {
 	VAL=$1
 	SHM=/dev/shm/$2
 	if [ -e $SHM ]; then
@@ -123,19 +131,19 @@ diskspace () {
 processes () {
 	IFS='
 '
-	PS=`ps auxww`
+	PS=`ps auxww | tail -n +2`
 	i=0
-	for line in $PS; do
+	json_array "processes"
+	for LINE in $PS; do
 		IFS=' '
-		LINE=`echo $line`
-		if [ "$i" -ne "0" ]; then echo , ; fi 
-		echo -n "{"
-		json_number "CPU" `echo $LINE | cut -d\  -f 3 `
-		json_number "MEM" `echo $LINE | cut -d\  -f 4 `
+		json_obj
+		json_string "CPU" `echo $LINE | cut -d\  -f 3 `
+		json_string "MEM" `echo $LINE | cut -d\  -f 4 `
 		json_string "COMMAND" "`echo $LINE | cut -d\  -f 11- `"
-		echo "}"
 		i=$((i+1))
+		json_obj end
 	done
+	json_array
 	unset $IFS
 }
 
@@ -156,35 +164,70 @@ info () {
 }
 
 upnp () {
+	OSHM="upnp.out.shm"
+	ISHM="upnp.in.shm"
+	TSHM="upnp.time.shm"
+
 	UPNP=`upnpc -s | grep Bytes`
-	OUT=`echo ${UPNP} | awk -F ":" '{print $3}' | awk -F " " '{print $1}'`
-	IN=`echo ${UPNP} | awk -F ":" '{print $4}' | awk -F " " '{print $1}'`
+	OUT=`echo ${UPNP} | cut -d: -f3 | cut -c2-12`
+	IN=`echo ${UPNP} | cut -d: -f4`
+
+	NOW=`date +%s`
+	diff_val_shm $NOW $TSHM
+	ELAPSED=$?
+	
+	diff_val_shm $OUT $OSHM
+	ODIFF=$?
+	ORATE=`echo ${ODIFF}*8/\(${ELAPSED}*1024\) | bc`
+
+	diff_val_shm $IN $ISHM
+	IDIFF=$?
+	IRATE=`echo ${IDIFF}*8/\(${ELAPSED}*1024\) | bc`
+		
 	json_string "version" "1.0.0"
 	json_array "datastreams"
 	
 	json_obj
-	json_string "id" "inOctets" 
+	json_string "id" "inBytes" 
 	json_number "current_value" $IN 
 	json_obj end 
 	
 	json_obj 
-	json_string "id" "outOctets" 
+	json_string "id" "outBytes" 
 	json_number "current_value" $OUT
+	json_obj end
+	
+	json_obj
+	json_string "id" "downloadRate"
+	json_number "current_value" $IRATE
+	json_obj end
+
+	json_obj
+	json_string "id" "uploadRate"
+	json_number "current_value" $ORATE
 	json_obj end
 
 	json_array
 }
 
 airport () {
-	OSHM="airport.out.fifo"
-	ISHM="airport.in.fifo"
+	OSHM="airport.out.shm"
+	ISHM="airport.in.shm"
+	TSHM="airport.time.shm"
 	CLIENTS=`snmpget -v 2c -c public ${AIRPORTIP} .1.3.6.1.4.1.63.501.3.2.1.0 -Ovq`
 	OUT=`snmpget -v 2c -c public ${AIRPORTIP} .1.3.6.1.2.1.2.2.1.16.6 -Ovq`
 	IN=`snmpget -v 2c -c public ${AIRPORTIP} .1.3.6.1.2.1.2.2.1.10.6 -Ovq`
-	diff_val_fifo $OUT $OSHM
+	
+	NOW=`date +%s`
+	diff_val_shm $NOW $TSHM
+	ELAPSED=$?
+	
+	diff_val_shm $OUT $OSHM
 	OUTDIFF=$?
-	diff_val_fifo $IN $ISHM
+	ORATE=`echo ${OUTDIFF}*8/\(${ELAPSED}*1024\) | bc`
+	diff_val_shm $IN $ISHM
 	INDIFF=$?
+	IRATE=`echo ${INDIFF}*8/\(${ELAPSED}*1024\) | bc`
 		
 	json_string "version" "1.0.0"
 	json_array "datastreams"
@@ -205,13 +248,13 @@ airport () {
 	json_obj end
 
 	json_obj
-	json_string "id" "inDiffOctets"
-	json_number "current_value" $INDIFF
+	json_string "id" "downloadRate"
+	json_number "current_value" $ORATE
 	json_obj end
 
 	json_obj
-	json_string "id" "outDiffOctets"
-	json_number "current_value" $OUTDIFF
+	json_string "id" "uploadRate"
+	json_number "current_value" $IRATE
 	json_obj end
 
 	json_array
