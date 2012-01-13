@@ -107,12 +107,11 @@ cpu () {
 diskspace () {
 	DF=`df | tail -n +2`
 	i=0
-	echo -n \"items\":\[
+	json_array "items"
 	for item in $DF; do
 		case $(($i % 6 )) in
 		0)	
-			if [ "$i" -ne "0" ]; then echo , ; fi 
-			echo -n "{"
+			json_obj
 			json_string "device" $item 
 			;;
 		4)
@@ -120,12 +119,12 @@ diskspace () {
 			;;
 		5)
 			json_string "mounted" $item
-			echo -n "}"
+			json_obj end
 			;;
 		esac
 		i=$((i+1))
 	done	
-	echo "]"
+	json_array
 }
 
 processes () {
