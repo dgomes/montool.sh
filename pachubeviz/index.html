@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang=en>
+	<head>
+		<meta charset=utf-8>
+		<title>PachubeViz</title>
+		<script src="http://code.jquery.com/jquery-latest.js"></script>
+
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/prototype/1.6.1/prototype.js"></script>
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/scriptaculous/1.8.2/scriptaculous.js"></script>
+		<!--[if IE]>
+		<script type="text/javascript" src="HumbleVisualization/lib/flotr/excanvas.js"></script>
+		<script type="text/javascript" src="HumbleVisualization/lib/flotr/base64.js"></script>
+		<![endif]-->
+		<script type="text/javascript" src="HumbleVisualization/lib/flotr/canvas2image.js"></script>
+		<script type="text/javascript" src="HumbleVisualization/lib/flotr/canvastext.js"></script>
+		<script type="text/javascript" src="HumbleVisualization/lib/flotr/flotr.js"></script>
+		<script type="text/javascript" src="HumbleVisualization/js/HumbleFinance.js"></script>
+		<script type="text/javascript" src="js/cookiejar.js"></script>
+
+		<link rel="stylesheet" href="http://twitter.github.com/bootstrap/1.4.0/bootstrap.min.css">
+		<link rel="stylesheet" type="text/css" href="css/meter.css">
+		<link rel="stylesheet" type="text/css" href="css/spinner.css">
+		<style type="text/css">
+			padding-top: 40px;
+		</style>
+	</head>
+	<body onload="javascript:start();">
+
+
+		<div class="topbar-wrapper" style="z-index: 5;">
+			<div class="topbar" data-dropdown="dropdown">
+				<div class="topbar-inner">
+					<div class="container">
+						<h3><a href="#">PachubeViz</a></h3>
+						<ul class="nav">
+							<li id="simples"><a href="javascript:setSimples()">Simples</a></li>
+							<li id="biHorario"><a href="javascript:setBiHorario()">Bi-Horário</a></li>
+							<li id="biHorarioSemanal" class="active"><a href="javascript:setBiHorarioSemanal()">Bi-Horário Semanal</a></li>
+						</ul>
+					</div>
+				</div><!-- /topbar-inner -->
+			</div><!-- /topbar -->
+		</div>
+
+
+		<h1>Pachube Viz</h1>
+		<script type="text/javascript" src="js/edp.js"></script>
+		<script type="text/javascript" src="js/pachube.js"></script>
+		<script>
+			var current_tarif = 'biHorarioSemanal';
+			var current_zoom = 96; //1d
+
+			function start() {
+				jar = new CookieJar({
+					expires:3600*24*31,   // seconds
+					path: '/'
+				});
+
+				if(jar.get('apiKey')) {			
+					pachube.apiKey = jar.get('apiKey');
+					$('apiKey').value = pachube.apiKey;
+				} else pachube.apiKey = null;
+				if(jar.get('feed')) {			
+					pachube.feed = jar.get('feed');
+					$('feed').value = pachube.feed;
+				} else pachube.feed = null;
+				
+				pachube.apiKey = '7N9EVxyxkASbci2MSXHDdhksIvKmt0UWrXpwndnVzfRiE6XahIWYeqc1wiNC_xMeOqEZhrVTab8PBEXDw4uDGvqrv0hDBXrMuOSH1HOQiG2G1uhbG34_uvsiVE_D_b9a';
+				pachube.feed = 30422;
+
+				jar.put('apiKey', pachube.apiKey);
+				jar.put('feed', pachube.feed);
+				pachube.requestDatastream('energySpent', '1week');
+				pachube.requestDatastream('power', '1week');	
+
+			}	
+
+			var plotPower = null;
+			var plotEnergy = null;
+
+			Ajax.Responders.register({
+				onComplete: function(){
+					plotPower = pachube.convert(pachube.datastream.power);
+					plotEnergy = pachube.energyToEuros(pachube.datastream.energySpent, edp.bihorario_semanal);
+					if(plotPower && plotEnergy) {
+						render();
+						$('loading').toggle();
+					}
+				}
+			});
+
+			zoom = function(points) {
+				current_zoom = points;
+				HumbleFinance.zoom(current_zoom);
+			}
+
+			function toggleTarifa(id) {
+				$(current_tarif).toggleClassName('active'); 
+				$(id).toggleClassName('active');
+				current_tarif = id; 
+			}
+			function setSimples() {
+				toggleTarifa('simples');
+				plotEnergy = pachube.energyToEuros(pachube.datastream.energySpent, edp.simples);
+				render();
+			}
+			function setBiHorario()	{
+				toggleTarifa('biHorario');
+				plotEnergy = pachube.energyToEuros(pachube.datastream.energySpent, edp.bihorario_diario);
+				render();
+			}
+			function setBiHorarioSemanal()	{
+				toggleTarifa('biHorarioSemanal');
+				plotEnergy = pachube.energyToEuros(pachube.datastream.energySpent, edp.bihorario_semanal);
+				render();
+			}
+
+			function render() {
+				HumbleFinance.init('energy', plotPower, plotEnergy, plotPower);
+
+				var xaxis = HumbleFinance.graphs.summary.axes.x;
+				var prevSelection = HumbleFinance.graphs.summary.prevSelection;
+				var xmin = xaxis.p2d(prevSelection.first.x);
+				var xmax = xaxis.p2d(prevSelection.second.x);
+				dataRangeCalc(xmin, xmax);
+
+				Event.observe(HumbleFinance.containers.summary, 'flotr:select', function (e) {
+					var area = e.memo[0];
+					xmin = Math.floor(area.x1);
+					xmax = Math.ceil(area.x2);
+					dataRangeCalc(xmin, xmax);
+				});
+				zoom(current_zoom);
+			}
+
+			var dataRangeCalc = function(xmin, xmax) {
+				date = pachube.datastream.power.datapoints;
+				start = new Date(date[xmin].at);
+				stop = new Date(date[xmax].at);
+
+				price = 0;
+				plotEnergy.each(function(p, i) {
+					if(i>xmin && i<=xmax)
+					price=price+p[1];
+				});
+				price = Math.round(price*100)/100;
+				$('dateRange').update(start.toDateString() + ' - ' + stop.toDateString() + ' - <b>'+price+'€</b>');
+			}
+
+			HumbleFinance.trackFormatter = function (obj) {
+				var x = Math.floor(obj.x);
+				var date = pachube.datastream.power.datapoints[x].at.split('.')[0];
+				var pw = plotPower[x][1]+'W';
+				var eur = plotEnergy[x][1]+'€';
+				return date+'\t'+pw+'\t'+eur;
+			};
+
+			HumbleFinance.yTickFormatter = function (n) {
+				if (n == this.max) {
+					return false;
+				}
+				return n+'W';
+			};
+
+			HumbleFinance.xTickFormatter = function (n) { 
+				n = parseInt(n);
+				if (n == 0) {
+					return false;
+				}
+				var date = new Date(pachube.datastream.power.datapoints[n].at);
+				var date = date.toDateString().split(' ');
+				return date[1]+' '+date[2];
+			};
+		</script>
+		<div id="energy">
+			<div id="labels">
+				<div id="time">
+					<a class="btn small" onclick="zoom(4);">1h</a>
+					<a class="btn small" onclick="zoom(96);">1d</a>
+					<a class="btn small" onclick="zoom(192);">2d</a>
+					<a class="btn small" onclick="zoom(672);">1w</a>
+				</div>
+				<div id="dateRange"></div>
+			</div>
+		</div>
+		<div id="loading" class="loading">
+			<div class="spinner">
+				<div class="bar1"></div>
+				<div class="bar2"></div>
+				<div class="bar3"></div>
+				<div class="bar4"></div>
+				<div class="bar5"></div>
+				<div class="bar6"></div>
+				<div class="bar7"></div>
+				<div class="bar8"></div>
+				<div class="bar9"></div>
+				<div class="bar10"></div>
+				<div class="bar11"></div>
+				<div class="bar12"></div>
+			</div>
+			<p>Loading...</p>
+		</div>
+		<form>
+			<fieldset>	
+				<div class="clearfix">
+					<label for="feed">Pachube Feed</label>
+					<div class="input">
+						<input class="xlarge" id="feed" name="feed" size="5" type="text">
+					</div>
+				</div>
+				<div class="clearfix">
+					<label for="apiKey">Pachube API Key</label>
+					<div class="input">
+						<input class="xlarge" id="apiKey" name="apiKey" size="120" type="text">
+					</div>
+				</div>
+			</fieldset>
+		</form>
+	</body>
+</html>

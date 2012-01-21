@@ -1,0 +1,98 @@
+.title {
+    text-align: center;
+}
+.subTitle {
+    font-size: 16px;
+}
+#summary {
+    padding: 16px 24px;
+    margin: 20px 40px 40px 40px;
+    border: 1px solid #AACCFF;
+    border-radius: 24px;
+    -moz-border-radius: 24px;
+    -webkit-border-radius: 24px;
+    text-align: justify;
+}
+#subLinks {
+    width: 600px;
+    height: 20px;
+    margin: 32px auto;
+    text-align: center;
+}
+#sublinks ul {
+    display: inline;
+    margin: 0px auto;
+}
+#subLinks li {
+    width: 150px;
+    float: left;
+}
+#subLinks li.currentPage {
+    font-weight: bold;
+}
+
+#meter {
+    position: relative;
+    margin: 40px 0px;
+    border: 1px solid #99CCFF;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#labels {
+    position: absolute;
+    width: 800px;
+    top: 60px;
+    z-index: 10;
+    left: 60px;
+}
+#meterTitle {
+    position: absolute;
+    top: -20px;
+}
+#dateRange {
+    position: absolute;
+    right: 4px;
+    top: -14px;
+    font-size: 10px;
+}
+.handle {
+    position: absolute;
+    z-index: 10;
+    cursor: pointer;
+    background: #eeeeee; 
+    border: 1px solid #bbbbbb; 
+    border-radius: 3px;
+    -webkit-border-radius: 3px; 
+    -moz-border-radius: 3px;
+}
+.zoomHandle {
+    width: 5px; 
+    height: 20px; 
+}
+.scrollHandle {
+    width: 100px;
+    height: 12px;
+}
+.flag {
+    border: 1px solid #4499FF;
+    background: white;
+    padding: 1px 2px 1px 2px;
+}
+.flagpole {
+    border-left: 1px solid #4499FF;
+}
+.flotr-grid-label {
+    font-size: 11px;
+    background: #ffffff;
+    margin: 2px 0px 0px 4px;
+}
+.flotr-mouse-value {
+    font-size: 10px;
+}
+#summaryGraph .flotr-grid-label {
+    margin-top: -16px;
+    background: transparent;
+    text-align: left;
+}
