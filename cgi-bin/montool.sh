@@ -168,7 +168,7 @@ upnp () {
 	TSHM="upnp.time.shm"
 
 	UPNP=`upnpc -s | grep Bytes`
-	OUT=`echo ${UPNP} | cut -d: -f3 | cut -c2-12`
+	OUT=`echo ${UPNP} | cut -d: -f3 | cut -d\  -f2`
 	IN=`echo ${UPNP} | cut -d: -f4`
 
 	NOW=`date +%s`
@@ -275,14 +275,24 @@ arduino () {
 }
 
 imeter () {
+	ESHM="imeter.energy.shm"
 	ENERGY=`wget -q -O - ${IMETERURL} | grep Wh | cut -b 25- | cut -d \  -f 1`
         POWER=`wget -q -O - ${IMETERURL} | grep "W&nbsp" | cut -b 25- | cut -d \  -f 1`
+	
+	diff_val_shm $ENERGY $ESHM
+	ENERGY_SPENT=$?
+
 	json_string "version" "1.0.0"
 	json_array "datastreams"
 	
 	json_obj 
 	json_string "id" "energy" 
 	json_string "current_value" $ENERGY 
+	json_obj end
+	
+	json_obj 
+	json_string "id" "energySpent" 
+	json_string "current_value" $ENERGY_SPENT
 	json_obj end
 	
 	json_obj 
